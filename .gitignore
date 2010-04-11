@@ -1,0 +1,7 @@
+Debug/*.d
+Debug/*.elf
+Debug/*.hex
+Debug/*.lss
+Debug/*.map
+Debug/nbproject/*
+Debug/*.o
