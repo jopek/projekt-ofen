@@ -14,13 +14,12 @@
 #define TWI_CMD_SET_UH    0x02
 #define TWI_CMD_SET_FAN   0x03
 
-/*! Local variables
- */
-static uint8_t TWI_RxBuf[TWI_RX_BUFFER_SIZE];
-static uint8_t TWI_TxBuf[TWI_TX_BUFFER_SIZE];
+/*! Local variables */
+static rxbuffer_union_t TWI_RxBuf;
+static txbuffer_union_t TWI_TxBuf;
 
 /* \Brief The main function.
- * The program entry point. Initates TWI and enters eternal loop, waiting for data.
+ * The program entry point. Initiates TWI and enters eternal loop, waiting for data.
  */
 int main(void)
 /* should be void and noreturn ... */
@@ -92,7 +91,7 @@ int main(void) {
 
 	// Own TWI slave address
 	TWI_slaveAddress = 0x50;
-	USI_TWI_Slave_Initialise(TWI_slaveAddress, TWI_RxBuf, TWI_TxBuf);
+	USI_TWI_Slave_Initialise(TWI_slaveAddress, &TWI_RxBuf, &TWI_TxBuf);
 
 	sei();
 	// This loop runs forever. If the TWI Transceiver is busy the execution will just continue doing other operations.
@@ -100,18 +99,19 @@ int main(void) {
 	USI_TWI_Set_TX_Start(TX_start);
 
 	for (;;) {
-
 		if ((RX_start = USI_TWI_Data_In_Receive_Buffer()) != -1) {
-			switch (TWI_RxBuf[RX_start]) {
-			case 0:
-				OCR1B = (TWI_RxBuf[RX_start + 1] << 4) + 0x0F;
-				OCR1A = (TWI_RxBuf[RX_start + 2] << 4) + 0x0F;
+			switch (TWI_RxBuf.b[RX_start]) {
+
+			// beide heizungen
+			case 0: {
+				OCR1B = (TWI_RxBuf.b[RX_start + 1] << 4) + 0x0F;
+				OCR1A = (TWI_RxBuf.b[RX_start + 2] << 4) + 0x0F;
 				//TCNT1=0x0FF0;
-				if (TWI_RxBuf[RX_start + 1])
+				if (TWI_RxBuf.b[RX_start + 1])
 					TCCR1A = 0x32;
 				else
 					TCCR1A = 0x02;
-				if (TWI_RxBuf[RX_start + 2]) {
+				if (TWI_RxBuf.b[RX_start + 2]) {
 					TIFR1 = 0x03;
 					TIMSK1 = 0x03;
 				} else {
@@ -119,18 +119,22 @@ int main(void) {
 					PORTA |= (1 << PA7);
 				}
 				break;
+			}
 
-			case 1:
-				OCR1B = (TWI_RxBuf[RX_start + 1] << 4) + 0x0F;
-				if (TWI_RxBuf[RX_start + 1])
+				// obere hitze
+			case 1: {
+				OCR1B = (TWI_RxBuf.b[RX_start + 1] << 4) + 0x0F;
+				if (TWI_RxBuf.b[RX_start + 1])
 					TCCR1A = 0x32;
 				else
 					TCCR1A = 0x02;
 				break;
+			}
 
-			case 2:
-				OCR1A = (TWI_RxBuf[RX_start + 1] << 4) + 0x0F;
-				if (TWI_RxBuf[RX_start + 1]) {
+				// untere hitze
+			case 2: {
+				OCR1A = (TWI_RxBuf.b[RX_start + 1] << 4) + 0x0F;
+				if (TWI_RxBuf.b[RX_start + 1]) {
 					TIFR1 = 0x03;
 					TIMSK1 = 0x03;
 				} else {
@@ -138,14 +142,17 @@ int main(void) {
 					PORTA |= (1 << PA7);
 				}
 				break;
+			}
 
-			case 3:
-				OCR0A = TWI_RxBuf[RX_start + 1];
+				// luefter
+			case 3: {
+				OCR0A = TWI_RxBuf.b[RX_start + 1];
 				if (OCR0A)
 					TCCR0A = 0x83;
 				else
 					TCCR0A = 0x03;
 				break;
+			}
 
 			default:
 				break;
@@ -153,10 +160,9 @@ int main(void) {
 
 			//RX_start = temp;
 			TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
-			TWI_TxBuf[TX_start] = 10;
-			TWI_TxBuf[TX_start + 1] = 0;
-			TWI_TxBuf[TX_start + 2] = 11;
-			TWI_TxBuf[TX_start + 3] = 0;
+			TWI_TxBuf.w[TX_start >> 1] = 10;
+			TWI_TxBuf.w[(TX_start >> 1) + 1] = 11;
+
 			USI_TWI_Set_TX_Start(TX_start);
 		}
 		// Do something else while waiting for the TWI transceiver to complete.

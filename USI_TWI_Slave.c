@@ -32,13 +32,12 @@ static volatile unsigned char USI_TWI_Overflow_State, DataReady;
 
 /*! Local variables
  */
-static uint8_t *TWI_RxBuf;
+static rxbuffer_union_t *TWI_RxBuf;
 static volatile uint8_t TWI_RxHead;
-//static volatile uint8_t TWI_RxTail;
 
-static uint8_t *TWI_TxBuf;
+static txbuffer_union_t *TWI_TxBuf;
 static volatile uint8_t TWI_TxHead;
-//static volatile uint8_t TWI_TxTail;
+
 static uint8_t TX_start = 0, RX_start = 0;
 
 /*! \brief Flushes the TWI buffers
@@ -55,8 +54,8 @@ void Flush_TWI_Buffers(void) {
 /*! \brief
  * Initialise USI for TWI Slave mode.
  */
-void USI_TWI_Slave_Initialise(unsigned char TWI_ownAddress, uint8_t *RxBuf,
-		uint8_t *TxBuf) {
+void USI_TWI_Slave_Initialise(unsigned char TWI_ownAddress, rxbuffer_union_t *RxBuf,
+		txbuffer_union_t *TxBuf) {
 	TWI_RxBuf = RxBuf;
 	TWI_TxBuf = TxBuf;
 	Flush_TWI_Buffers();
@@ -169,7 +168,7 @@ ISR(USI_OVERFLOW_VECTOR)
 
 		// Copy data from buffer to USIDR and set USI to shift byte. Next USI_SLAVE_REQUEST_REPLY_FROM_SEND_DATA
 	case USI_SLAVE_SEND_DATA:
-		USIDR = TWI_TxBuf[TWI_TxHead];
+		USIDR = TWI_TxBuf->b[TWI_TxHead];
 		TWI_TxHead = (TWI_TxHead + 1) & TWI_TX_BUFFER_MASK;
 
 		USI_TWI_Overflow_State = USI_SLAVE_REQUEST_REPLY_FROM_SEND_DATA;
@@ -193,7 +192,7 @@ ISR(USI_OVERFLOW_VECTOR)
 	case USI_SLAVE_GET_DATA_AND_SEND_ACK:
 		// Put data into Buffer
 		tmpUSIDR = USIDR; // Not necessary, but prevents warnings
-		TWI_RxBuf[TWI_RxHead] = tmpUSIDR;
+		TWI_RxBuf->b[TWI_RxHead] = tmpUSIDR;
 		TWI_RxHead = (TWI_RxHead + 1) & TWI_RX_BUFFER_MASK;
 
 		USI_TWI_Overflow_State = USI_SLAVE_REQUEST_DATA;

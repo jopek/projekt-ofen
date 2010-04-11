@@ -21,12 +21,6 @@
  *
  *
  ****************************************************************************/
-//! Prototypes
-void USI_TWI_Slave_Initialise(unsigned char, uint8_t *, uint8_t *);
-void usi_i2c_stop(void);
-void USI_TWI_Set_TX_Start(uint8_t);
-char USI_TWI_Data_In_Receive_Buffer(void);
-void Timer_Init(void);
 
 #define TRUE                1
 #define FALSE               0
@@ -53,6 +47,29 @@ typedef unsigned char uint8_t;
 #if ( TWI_TX_BUFFER_SIZE & TWI_TX_BUFFER_MASK )
 #error TWI TX buffer size is not a power of 2
 #endif
+
+typedef union {
+	uint8_t b[TWI_RX_BUFFER_SIZE];
+	uint16_t w[TWI_RX_BUFFER_SIZE / 2];
+} rxbuffer_union_t;
+
+typedef union {
+	uint8_t b[TWI_TX_BUFFER_SIZE];
+	uint16_t w[TWI_TX_BUFFER_SIZE / 2];
+} txbuffer_union_t;
+
+
+//! Prototypes
+void USI_TWI_Slave_Initialise(unsigned char, rxbuffer_union_t *, txbuffer_union_t *);
+void usi_i2c_stop(void);
+void USI_TWI_Set_TX_Start(uint8_t);
+char USI_TWI_Data_In_Receive_Buffer(void);
+void Timer_Init(void);
+
+
+
+
+
 
 #define USI_SLAVE_CHECK_ADDRESS                (0x00)
 #define USI_SLAVE_SEND_DATA                    (0x01)
