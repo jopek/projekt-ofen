@@ -1,25 +1,3 @@
-// This file has been prepared for Doxygen automatic documentation generation.
-/*! \file ********************************************************************
- *
- * Atmel Corporation
- *
- * File              : USI_TWI_Slave.c
- * Compiler          : IAR EWAAVR 3.20c
- * Revision          : $Revision: 1.14 $
- * Date              : $Date: Friday, December 09, 2005 17:25:38 UTC $
- * Updated by        : $Author: jtyssoe $
- *
- * Support mail      : avr@atmel.com
- *
- * Supported devices : All device with USI module can be used.
- *
- * AppNote           : AVR312 - Using the USI module as a I2C slave
- *
- * Description       : Example showing how to use the USI_TWI drivers;
- *                     Loops back received data.
- *
- *
- ****************************************************************************/
 // Chip type           : ATtiny44
 // Clock frequency     : 1,638400 MHz
 
@@ -118,14 +96,7 @@ int main(void) {
 
 	sei();
 	// This loop runs forever. If the TWI Transceiver is busy the execution will just continue doing other operations.
-	TWI_TxBuf[0] = 1;
-	TWI_TxBuf[1] = 1;
-	TWI_TxBuf[2] = 1;
-	TWI_TxBuf[3] = 1;
-	TWI_TxBuf[4] = 1;
-	TWI_TxBuf[5] = 1;
-	TWI_TxBuf[6] = 1;
-	TWI_TxBuf[7] = 1;
+
 	USI_TWI_Set_TX_Start(TX_start);
 
 	for (;;) {

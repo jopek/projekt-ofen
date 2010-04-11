@@ -76,31 +76,10 @@ void USI_TWI_Slave_Initialise(unsigned char TWI_ownAddress, uint8_t *RxBuf,
 	USISR = 0xF0; // Clear all flags and reset overflow counter
 }
 
-/*! \brief Puts data in the transmission buffer, Waits if buffer is full.
-
- void USI_TWI_Transmit_Byte( unsigned char data )
- {
- TWI_TxBuf[TWI_TxHead] = data;                                 // Store data in buffer.
- TWI_TxHead = ( TWI_TxHead + 1 ) & TWI_TX_BUFFER_MASK;         // Calculate buffer index.
- }
- */
-
 // Select TX buffer start address
-
 void USI_TWI_Set_TX_Start(uint8_t start) {
 	TX_start = start;
 }
-
-/*! \brief Returns a byte from the receive buffer. Waits if buffer is empty.
- 
- unsigned char USI_TWI_Receive_Byte( void )
- {
- unsigned char tmphead;
- tmphead =   TWI_RxHead;       // Calculate buffer index
- TWI_RxHead = ( TWI_RxHead + 1 ) & TWI_RX_BUFFER_MASK;                                   // Store new index
- return TWI_RxBuf[tmphead];                                // Return data from the buffer.
- }
- */
 
 /*! \brief Check if there is data in the receive buffer.
  */
@@ -160,8 +139,8 @@ ISR(USI_OVERFLOW_VECTOR)
 	unsigned char tmpUSIDR;
 
 	switch (USI_TWI_Overflow_State) {
-	// ---------- Address mode ----------
-	// Check address and send ACK (and next USI_SLAVE_SEND_DATA) if OK, else reset USI.
+		// ---------- Address mode ----------
+		// Check address and send ACK (and next USI_SLAVE_SEND_DATA) if OK, else reset USI.
 	case USI_SLAVE_CHECK_ADDRESS:
 		if ((USIDR == 0) || ((USIDR >> 1) == TWI_slaveAddress)) {
 			if (USIDR & 0x01) {
@@ -190,37 +169,24 @@ ISR(USI_OVERFLOW_VECTOR)
 
 		// Copy data from buffer to USIDR and set USI to shift byte. Next USI_SLAVE_REQUEST_REPLY_FROM_SEND_DATA
 	case USI_SLAVE_SEND_DATA:
-
-		// Get data from Buffer
-		//tmpTxTail = TWI_TxTail;           // Not necessary, but prevents warnings
-		//if ( TWI_TxHead != tmpTxTail )
-		//{
 		USIDR = TWI_TxBuf[TWI_TxHead];
 		TWI_TxHead = (TWI_TxHead + 1) & TWI_TX_BUFFER_MASK;
-		//}
-		//else // If the buffer is empty then:
-		//{
-		//    SET_USI_TO_TWI_START_CONDITION_MODE();
-		//    return;
-		//}
+
 		USI_TWI_Overflow_State = USI_SLAVE_REQUEST_REPLY_FROM_SEND_DATA;
-		SET_USI_TO_SEND_DATA()
-		;
+		SET_USI_TO_SEND_DATA();
 		break;
 
 		// Set USI to sample reply from master. Next USI_SLAVE_CHECK_REPLY_FROM_SEND_DATA
 	case USI_SLAVE_REQUEST_REPLY_FROM_SEND_DATA:
 		USI_TWI_Overflow_State = USI_SLAVE_CHECK_REPLY_FROM_SEND_DATA;
-		SET_USI_TO_READ_ACK()
-		;
+		SET_USI_TO_READ_ACK();
 		break;
 
 		// ----- Master read data mode ------
 		// Set USI to sample data from master. Next USI_SLAVE_GET_DATA_AND_SEND_ACK.
 	case USI_SLAVE_REQUEST_DATA:
 		USI_TWI_Overflow_State = USI_SLAVE_GET_DATA_AND_SEND_ACK;
-		SET_USI_TO_READ_DATA()
-		;
+		SET_USI_TO_READ_DATA();
 		break;
 
 		// Copy data from USIDR and send ACK. Next USI_SLAVE_REQUEST_DATA
@@ -231,8 +197,7 @@ ISR(USI_OVERFLOW_VECTOR)
 		TWI_RxHead = (TWI_RxHead + 1) & TWI_RX_BUFFER_MASK;
 
 		USI_TWI_Overflow_State = USI_SLAVE_REQUEST_DATA;
-		SET_USI_TO_SEND_ACK()
-		;
+		SET_USI_TO_SEND_ACK();
 		break;
 	}
 }

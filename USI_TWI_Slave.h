@@ -23,8 +23,6 @@
  ****************************************************************************/
 //! Prototypes
 void USI_TWI_Slave_Initialise(unsigned char, uint8_t *, uint8_t *);
-//void          USI_TWI_Transmit_Byte( unsigned char );
-//unsigned char USI_TWI_Receive_Byte( void );
 void usi_i2c_stop(void);
 void USI_TWI_Set_TX_Start(uint8_t);
 char USI_TWI_Data_In_Receive_Buffer(void);
