@@ -170,32 +170,8 @@ int main(void) {
 	}
 }
 
-/*! \mainpage
- * \section Intro Introduction
- * This documents data structures, functions, variables, defines, enums, and
- * typedefs in the software for application note AVR312.
- *
- * \section CI Compilation Info
- * This software was written for the IAR Embedded Workbench 4.11A.
- *
- * To make project:
- * <ol>
- * <li> Add the file main.c and USI_TWI_Slave to project.
- * <li> Under processor configuration, select any AVR device with USI module.
- * <li> Enable bit definitions in I/O include files
- * <li> High optimization on size is recommended for lower code size.
- * </ol>
- *
- * \section DI Device Info
- * The included source code is written for all devices with with a USI module.
- *
- * \section TS Target setup
- * This example is made to work together with the AVR310 USI TWI Master application note. In adition to connecting the TWI
- * pins, also connect PORTB to the LEDS. The code reads a message as a TWI slave and acts according to if it is a
- * general call, or an address call. If it is an address call, then the first byte is considered a command byte and
- * it then responds differently according to the commands.
- *
- */
+
+
 ISR(TIM1_OVF_vect, ISR_NAKED)
 {
 	PORTA &= ~(1 << PA7); // results in CBI which does not affect SREG
