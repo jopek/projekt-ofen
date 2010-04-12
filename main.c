@@ -184,3 +184,8 @@ ISR(TIM1_COMPA_vect, ISR_NAKED)
 	reti();
 }
 
+ISR(ADC_vect)
+{
+	;
+}
+
