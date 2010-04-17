@@ -17,6 +17,8 @@
 /*! Local variables */
 static rxbuffer_union_t TWI_RxBuf;
 static txbuffer_union_t TWI_TxBuf;
+static uint16_t adcAccu;
+static uint16_t adcCnt;
 
 /* \Brief The main function.
  * The program entry point. Initiates TWI and enters eternal loop, waiting for data.
@@ -28,6 +30,8 @@ __attribute__((naked));
 int main(void) {
 	unsigned char TWI_slaveAddress;
 	int8_t RX_start, TX_start = 0;
+	adcAccu = 0;
+	adcCnt = 0;
 
 	clock_prescale_set(clock_div_2);
 
@@ -89,6 +93,16 @@ int main(void) {
 	ACSR = 0x80;
 	ADCSRB = 0x00;
 
+	// ADC initialization
+	// ADC Clock frequency: 51.200 kHz
+	// ADC Bipolar Input Mode: Off
+	// ADC Auto Trigger Source: ADC Stopped
+	// Digital input buffers on ADC0: On, ADC1: On, ADC2: Off, ADC3: Off
+	// ADC4: On, ADC5: On, ADC6: On, ADC7: On
+	DIDR0 = 0x0C;
+	ADCSRA = 0x8D;
+	ADCSRB &= 0x6F;
+
 	// Own TWI slave address
 	TWI_slaveAddress = 0x50;
 	USI_TWI_Slave_Initialise(TWI_slaveAddress, &TWI_RxBuf, &TWI_TxBuf);
@@ -102,7 +116,7 @@ int main(void) {
 		if ((RX_start = USI_TWI_Data_In_Receive_Buffer()) != -1) {
 			switch (TWI_RxBuf.b[RX_start]) {
 
-			// beide heizungen
+				// beide heizungen
 			case 0: {
 				OCR1B = (TWI_RxBuf.b[RX_start + 1] << 4) + 0x0F;
 				OCR1A = (TWI_RxBuf.b[RX_start + 2] << 4) + 0x0F;
@@ -170,11 +184,21 @@ int main(void) {
 	}
 }
 
-
-
-ISR(TIM1_OVF_vect, ISR_NAKED)
+ISR(TIM1_OVF_vect)
 {
 	PORTA &= ~(1 << PA7); // results in CBI which does not affect SREG
+
+	// adcAccu /= 16;
+	if(adcCnt++ == 15)
+	{
+		TWI_TxBuf.w[TX_start >> 1] = adcAccu >> 4;
+		adcAccu = 0;
+	}
+
+	if(adcCnt == 24)
+		adcAccu = 0;
+
+	ADCSRA |= (1 << ADSC); // start ADC Conversion
 	reti();
 }
 
@@ -186,6 +210,7 @@ ISR(TIM1_COMPA_vect, ISR_NAKED)
 
 ISR(ADC_vect)
 {
-	;
+	unsigned int adc_data;
+	adcAccu+=ADCW;
 }
 
