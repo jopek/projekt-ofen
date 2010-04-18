@@ -26,7 +26,7 @@ static uint16_t adcAccu[2];
  */
 #define ADCCNT_SHIFT 7
 #define ADCACCU_SEL 6
-static uint8_t adcCnt;
+volatile uint8_t adcCnt;
 
 /* \Brief The main function.
  * The program entry point. Initiates TWI and enters eternal loop, waiting for data.
@@ -68,6 +68,8 @@ int main(void) {
 	TCNT0 = 0x00;
 	OCR0A = 0x00;
 	OCR0B = 0x00;
+	TIMSK0 = 1 << TOIE0; // enable timer0 interrupt
+
 
 	// Timer/Counter 1 initialization
 	// Clock source: System Clock
@@ -111,6 +113,13 @@ int main(void) {
 	DIDR0 = 0x0C;
 	ADCSRA = 0x8D;
 	ADCSRB &= 0x6F;
+
+	// 1 0 Internal 1.1V voltage reference
+	ADMUX = 0x80;
+
+	// ADC1 (PA1) 000001
+	// ADC2 (PA2) 000010
+	ADMUX |= 0x02;
 
 	// Own TWI slave address
 	TWI_slaveAddress = 0x50;
@@ -179,28 +188,26 @@ int main(void) {
 
 			default:
 				break;
-			}
+			} // switch
+		} // if RX_start
 
-			TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
-
-			if (adcCnt & ADCCNT_SHIFT) {
-				//RX_start = temp;
-				TWI_TxBuf.w[TX_start >> 1] = adcAccu[0] >> 2;
-				TWI_TxBuf.w[(TX_start >> 1) + 1] = adcAccu[1] >> 2;
-				adcAccu[0] = 0;
-				adcAccu[1] = 0;
-			}
-			USI_TWI_Set_TX_Start(TX_start);
+		TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
+		if (adcCnt & (1 << ADCCNT_SHIFT)) {
+			adcCnt &= ~(1 << ADCCNT_SHIFT);
+			TIMSK0 = 0;
+			TWI_TxBuf.w[TX_start >> 1] = adcAccu[0] >> 2;
+			TWI_TxBuf.w[(TX_start >> 1) + 1] = adcAccu[1] >> 2;
+			adcAccu[0] = 0;
+			adcAccu[1] = 0;
+			TIMSK0 = 1 << TOIE0;
 		}
-		// Do something else while waiting for the TWI transceiver to complete.
-		// Put own code here.
-	}
+		USI_TWI_Set_TX_Start(TX_start);
+	} // for
 }
 
-ISR(TIM1_OVF_vect)
+ISR(TIM0_OVF_vect)
 {
 	uint8_t c;
-	PORTA &= ~(1 << PA7); // results in CBI which does not affect SREG
 
 	adcCnt++;
 	c = adcCnt & 0x3f;
@@ -209,13 +216,22 @@ ISR(TIM1_OVF_vect)
 		ADCSRA |= (1 << ADSC); // start ADC Conversion
 	}
 
-	if (c == 25) {
-		adcCnt &= 0xb0; // clear lower bits
-		adcCnt |= (1 << ADCCNT_SHIFT);
+	if (c == 17) {
+		if (adcCnt & (1 << ADCACCU_SEL))
+			adcCnt |= (1 << ADCCNT_SHIFT);
+
 		adcCnt ^= 1 << ADCACCU_SEL;
-		ADMUX ^= 1; // toggle adc 0 and adc 1
 	}
 
+	if (c == 25) {
+		adcCnt &= (1 << ADCCNT_SHIFT | 1 << ADCACCU_SEL); // clear lower bits
+		ADMUX ^= 3; // toggle adc 1 and adc 2
+	}
+}
+
+ISR(TIM1_OVF_vect, ISR_NAKED)
+{
+	PORTA &= ~(1 << PA7); // results in CBI which does not affect SREG
 	reti();
 }
 
@@ -229,6 +245,5 @@ ISR(ADC_vect)
 {
 	uint8_t accu_selection = (adcCnt >> ADCACCU_SEL) & 1;
 	adcAccu[accu_selection] += ADCW;
-	reti();
 }
 
