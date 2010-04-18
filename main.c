@@ -17,8 +17,16 @@
 /*! Local variables */
 static rxbuffer_union_t TWI_RxBuf;
 static txbuffer_union_t TWI_TxBuf;
-static uint16_t adcAccu;
-static uint16_t adcCnt;
+
+// adc values for top and lower temp sensors
+static uint16_t adcAccu[2];
+
+/* adc counter
+ *  [bit 7: start shifting | bit 6: temp high or low? | bit 0-5: counter values]
+ */
+#define ADCCNT_SHIFT 7
+#define ADCACCU_SEL 6
+static uint8_t adcCnt;
 
 /* \Brief The main function.
  * The program entry point. Initiates TWI and enters eternal loop, waiting for data.
@@ -30,7 +38,8 @@ __attribute__((naked));
 int main(void) {
 	unsigned char TWI_slaveAddress;
 	int8_t RX_start, TX_start = 0;
-	adcAccu = 0;
+	adcAccu[0] = 0;
+	adcAccu[1] = 0;
 	adcCnt = 0;
 
 	clock_prescale_set(clock_div_2);
@@ -172,11 +181,15 @@ int main(void) {
 				break;
 			}
 
-			//RX_start = temp;
 			TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
-			TWI_TxBuf.w[TX_start >> 1] = 10;
-			TWI_TxBuf.w[(TX_start >> 1) + 1] = 11;
 
+			if (adcCnt & ADCCNT_SHIFT) {
+				//RX_start = temp;
+				TWI_TxBuf.w[TX_start >> 1] = adcAccu[0] >> 2;
+				TWI_TxBuf.w[(TX_start >> 1) + 1] = adcAccu[1] >> 2;
+				adcAccu[0] = 0;
+				adcAccu[1] = 0;
+			}
 			USI_TWI_Set_TX_Start(TX_start);
 		}
 		// Do something else while waiting for the TWI transceiver to complete.
@@ -186,19 +199,23 @@ int main(void) {
 
 ISR(TIM1_OVF_vect)
 {
+	uint8_t c;
 	PORTA &= ~(1 << PA7); // results in CBI which does not affect SREG
 
-	// adcAccu /= 16;
-	if(adcCnt++ == 15)
-	{
-		TWI_TxBuf.w[TX_start >> 1] = adcAccu >> 4;
-		adcAccu = 0;
+	adcCnt++;
+	c = adcCnt & 0x3f;
+
+	if (c <= 16) {
+		ADCSRA |= (1 << ADSC); // start ADC Conversion
 	}
 
-	if(adcCnt == 24)
-		adcAccu = 0;
+	if (c == 25) {
+		adcCnt &= 0xb0; // clear lower bits
+		adcCnt |= (1 << ADCCNT_SHIFT);
+		adcCnt ^= 1 << ADCACCU_SEL;
+		ADMUX ^= 1; // toggle adc 0 and adc 1
+	}
 
-	ADCSRA |= (1 << ADSC); // start ADC Conversion
 	reti();
 }
 
@@ -210,7 +227,8 @@ ISR(TIM1_COMPA_vect, ISR_NAKED)
 
 ISR(ADC_vect)
 {
-	unsigned int adc_data;
-	adcAccu+=ADCW;
+	uint8_t accu_selection = (adcCnt >> ADCACCU_SEL) & 1;
+	adcAccu[accu_selection] += ADCW;
+	reti();
 }
 
