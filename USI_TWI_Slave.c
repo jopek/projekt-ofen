@@ -28,8 +28,8 @@
  */
 
 static unsigned char TWI_slaveAddress;
-static volatile unsigned char USI_TWI_Overflow_State, DataReady;
-
+static volatile unsigned char USI_TWI_Overflow_State;
+static volatile unsigned char recv_byte_counter = 0;
 /*! Local variables
  */
 static rxbuffer_union_t *TWI_RxBuf;
@@ -59,7 +59,6 @@ void USI_TWI_Slave_Initialise(unsigned char TWI_ownAddress, rxbuffer_union_t *Rx
 	TWI_RxBuf = RxBuf;
 	TWI_TxBuf = TxBuf;
 	Flush_TWI_Buffers();
-	DataReady = 0;
 
 	TWI_slaveAddress = TWI_ownAddress;
 
@@ -83,22 +82,15 @@ void USI_TWI_Set_TX_Start(uint8_t start) {
 /*! \brief Check if there is data in the receive buffer.
  */
 char USI_TWI_Data_In_Receive_Buffer(void) {
-	if (USISR & (1 << USIPF))
-		usi_i2c_stop(); // check i2c_stop
-	if (DataReady == 0)
-		return -1; // Return -1 if the receive buffer is empty.
-	DataReady = 0;
-	if (TWI_RxHead != RX_start)
-		return (RX_start + 4) & TWI_RX_BUFFER_MASK;
-	return -1;
-}
+	uint8_t tmp;
+	if (recv_byte_counter < 3)
+		return -1;
 
-void usi_i2c_stop(void) {
-	USISR = (1 << USIPF);
-	if (USI_TWI_Overflow_State != USI_SLAVE_GET_DATA_AND_SEND_ACK)
-		return;
+	recv_byte_counter = 0;
+	tmp = RX_start;
 	RX_start = (RX_start + 4) & TWI_RX_BUFFER_MASK;
-	DataReady = 1;
+
+	return tmp;
 }
 
 /*! \brief Usi start condition ISR
@@ -116,9 +108,6 @@ ISR(USI_START_VECTOR)
 	while ((PIN_USI & (1 << PORT_USI_SCL)) & !(USISR & (1 << USIPF)))
 		; // Wait for SCL to go low to ensure the "Start Condition" has completed.
 	// If a Stop condition arises then leave the interrupt to prevent waiting forever.
-	if (USISR & (1 << USIPF)) { // test for Stop
-		usi_i2c_stop();
-	}
 
 	USICR = (1 << USISIE) | (1 << USIOIE) | // Enable Overflow and Start Condition Interrupt. (Keep StartCondInt to detect RESTART)
 			(1 << USIWM1) | (1 << USIWM0) | // Set USI in Two-wire mode.
@@ -137,6 +126,7 @@ ISR(USI_OVERFLOW_VECTOR)
 {
 	unsigned char tmpUSIDR;
 
+
 	switch (USI_TWI_Overflow_State) {
 		// ---------- Address mode ----------
 		// Check address and send ACK (and next USI_SLAVE_SEND_DATA) if OK, else reset USI.
@@ -148,6 +138,7 @@ ISR(USI_OVERFLOW_VECTOR)
 			} else {
 				USI_TWI_Overflow_State = USI_SLAVE_REQUEST_DATA;
 				TWI_RxHead = RX_start;
+				recv_byte_counter = 0;
 			}
 			SET_USI_TO_SEND_ACK();
 
@@ -194,6 +185,7 @@ ISR(USI_OVERFLOW_VECTOR)
 		tmpUSIDR = USIDR; // Not necessary, but prevents warnings
 		TWI_RxBuf->b[TWI_RxHead] = tmpUSIDR;
 		TWI_RxHead = (TWI_RxHead + 1) & TWI_RX_BUFFER_MASK;
+		recv_byte_counter++;
 
 		USI_TWI_Overflow_State = USI_SLAVE_REQUEST_DATA;
 		SET_USI_TO_SEND_ACK();
