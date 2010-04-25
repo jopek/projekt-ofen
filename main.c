@@ -109,9 +109,9 @@ int main(void) {
 	// ADC Clock frequency: 51.200 kHz
 	// ADC Bipolar Input Mode: Off
 	// ADC Auto Trigger Source: ADC Stopped
-	// Digital input buffers on ADC0: On, ADC1: On, ADC2: Off, ADC3: Off
+	// Digital input buffers on ADC0: Off, ADC1: Off, ADC2: Off, ADC3: Off
 	// ADC4: On, ADC5: On, ADC6: On, ADC7: On
-	DIDR0 = 0x0C;
+	DIDR0 = 0x0F;
 	ADCSRA = 0x8D;
 	ADCSRB &= 0x6F;
 
@@ -120,7 +120,7 @@ int main(void) {
 
 	// ADC1 (PA1) 000001
 	// ADC2 (PA2) 000010
-	ADMUX |= 0x02;
+	ADMUX |= 0x10;
 
 	// Own TWI slave address
 	TWI_slaveAddress = 0x50;
@@ -239,7 +239,7 @@ ISR(TIM0_OVF_vect)
 
 	if (c == 25) {
 		adcCnt &= (1 << ADCCNT_SHIFT | 1 << ADCACCU_SEL); // clear lower bits
-		ADMUX ^= 3; // toggle adc 1 and adc 2
+		ADMUX ^= 0x1e; // toggle adc 1 and adc 2 mit adc3 neg input
 	}
 }
 
