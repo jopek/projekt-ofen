@@ -6,6 +6,7 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <avr/power.h>
+#include <avr/sleep.h>
 #include "USI_TWI_Slave.h"
 
 // TWI transmission commands
@@ -125,6 +126,7 @@ int main(void) {
 	TWI_slaveAddress = 0x50;
 	USI_TWI_Slave_Initialise(TWI_slaveAddress, &TWI_RxBuf, &TWI_TxBuf);
 
+	set_sleep_mode(SLEEP_MODE_IDLE);
 	sei();
 	// This loop runs forever. If the TWI Transceiver is busy the execution will just continue doing other operations.
 
@@ -191,8 +193,8 @@ int main(void) {
 			} // switch
 		} // if RX_start
 
-		TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
 		if (adcCnt & (1 << ADCCNT_SHIFT)) {
+			TX_start = (TX_start + 4) & TWI_TX_BUFFER_MASK;
 			adcCnt &= ~(1 << ADCCNT_SHIFT);
 			TIMSK0 = 0;
 			TWI_TxBuf.w[TX_start >> 1] = adcAccu[0] >> 2;
@@ -200,8 +202,17 @@ int main(void) {
 			adcAccu[0] = 0;
 			adcAccu[1] = 0;
 			TIMSK0 = 1 << TOIE0;
+			USI_TWI_Set_TX_Start(TX_start);
 		}
-		USI_TWI_Set_TX_Start(TX_start);
+
+
+		cli();
+		sleep_enable();
+		sei();
+		sleep_cpu();
+		sleep_disable();
+		sei();
+
 	} // for
 }
 
@@ -213,6 +224,9 @@ ISR(TIM0_OVF_vect)
 	c = adcCnt & 0x3f;
 
 	if (c <= 16) {
+		ADCSRA |= (1 << ADIF);	// adc-interrupt flag zuruecksetzen, wegen adc noise canceler
+		ADCSRA |= (1 << ADIE); // adc-interrupt wieder einschalten
+
 		ADCSRA |= (1 << ADSC); // start ADC Conversion
 	}
 
@@ -245,5 +259,7 @@ ISR(ADC_vect)
 {
 	uint8_t accu_selection = (adcCnt >> ADCACCU_SEL) & 1;
 	adcAccu[accu_selection] += ADCW;
+	ADCSRA &= ~(1 << ADIE); // adc-interrupt ausschalten
+	//PORTA ^= (1 << PA5);
 }
 
